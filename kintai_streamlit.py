@@ -126,3 +126,11 @@ if name and st.button("月次データを取得"):
         st.markdown(f"✅ **交通費合計**: {total_fee:.0f} 円")
     else:
         st.error(f"データ取得に失敗しました: {response.text}")
+
+    else:
+        df["日付"] = pd.to_datetime(df["日付"])
+        df = df.sort_values("日付")
+        st.dataframe(df, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 CSVダウンロード", data=csv, file_name=f"{query_name}_{query_month}_勤怠.csv", mime="text/csv")
