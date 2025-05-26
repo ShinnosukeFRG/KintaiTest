@@ -114,7 +114,7 @@ if st.button("月次を集計する") and query_name and query_month:
         }
     }
 
-    response = requests.post(url, headers=headers, json=query_payload)
+    res = requests.post(url, headers=headers, json=query_payload)
     data = res.json()
 
     records = []
