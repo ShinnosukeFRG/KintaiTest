@@ -4,8 +4,8 @@ import requests
 import pytz
 
 # Notion API 情報
-NOTION_API_KEY = "秘密"
-DATABASE_ID = "ここに新しいDBのIDを入力"
+NOTION_API_KEY = "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"
+DATABASE_ID = "1ffe3c1a837a8116935efa71d54c36da"
 headers = {
     "Authorization": f"Bearer {NOTION_API_KEY}",
     "Content-Type": "application/json",
