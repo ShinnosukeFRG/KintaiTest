@@ -78,7 +78,16 @@ st.header("📊 月次勤怠集計")
 query_name = st.text_input("集計する名前を入力", key="name_query")
 query_month = st.text_input("対象月（例：2025-05）", key="month_query")
 
+import calendar
+
+# ボタンが押されたら処理開始
 if st.button("月次を集計する") and query_name and query_month:
+    # query_month は "2025-05" の形式で入力されている想定
+    year, month = map(int, query_month.split("-"))
+    _, last_day = calendar.monthrange(year, month)
+    start_date = f"{query_month}-01"
+    end_date = f"{query_month}-{last_day:02d}"
+
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     query_payload = {
         "filter": {
@@ -92,20 +101,20 @@ if st.button("月次を集計する") and query_name and query_month:
                 {
                     "property": "日付",
                     "date": {
-                        "on_or_after": f"{query_month}-01"
+                        "on_or_after": start_date
                     }
                 },
                 {
                     "property": "日付",
                     "date": {
-                        "before": f"{query_month}-32"
+                        "on_or_before": end_date
                     }
                 }
             ]
         }
     }
 
-    res = requests.post(url, headers=headers, json=query_payload)
+    response = requests.post(url, headers=headers, json=query_payload)
     data = res.json()
 
     records = []
