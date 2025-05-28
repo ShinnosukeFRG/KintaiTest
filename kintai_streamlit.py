@@ -80,7 +80,10 @@ query_month = st.text_input("集計対象の月 (例: 2025-05)")
 if st.button("月次を集計する") and query_name and query_month:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     start_date = f"{query_month}-01"
-    end_date = f"{query_month}-32"
+    # 月末日を動的に計算
+    year, month = map(int, query_month.split("-"))
+    last_day = calendar.monthrange(year, month)[1]
+    end_date = f"{query_month}-{last_day:02d}"
 
     query_payload = {
         "filter": {
