@@ -5,7 +5,7 @@ import pytz
 import pandas as pd
 
 # Notion API 情報
-NOTION_API_KEY = "秘密"
+NOTION_API_KEY = "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"
 DATABASE_ID = "1ffe3c1a837a8116935efa71d54c36da"
 headers = {
     "Authorization": f"Bearer {NOTION_API_KEY}",
@@ -13,14 +13,16 @@ headers = {
     "Notion-Version": "2022-06-28"
 }
 
-# 日本時間
+# 日本時間の現在日時
 jst = pytz.timezone('Asia/Tokyo')
 today = datetime.datetime.now(jst).date()
+now_time = datetime.datetime.now(jst).time().strftime("%H:%M")
 
-# Streamlit UI
 st.title("勤怠打刻ページ")
 
-# 入力欄
+# -------------------------
+# 🔸 打刻入力フォーム
+# -------------------------
 name = st.text_input("名前を入力してください")
 selected_date = st.date_input("打刻日", value=today)
 day_of_week = selected_date.strftime('%a')
@@ -31,7 +33,7 @@ company_time = st.number_input("自社勤務時間（時間）", min_value=0.0, 
 transport_fee = st.number_input("交通費（円）", min_value=0)
 special_note = st.selectbox("特記事項", ["なし", "有給", "特別休暇", "遅刻", "早退"])
 
-# 稼働時間計算
+# 稼働時間自動計算
 start_dt = datetime.datetime.combine(selected_date, begin_time)
 end_dt = datetime.datetime.combine(selected_date, end_time)
 worked_hours = max((end_dt - start_dt).total_seconds() / 3600 - break_time, 0)
@@ -67,11 +69,14 @@ if st.button("打刻を送信"):
         else:
             st.error(f"エラーが発生しました: {response.text}")
 
-# ========== 月次集計機能 ==========
+# -------------------------
+# 📊 月次勤怠集計セクション
+# -------------------------
 st.markdown("---")
-st.header("月次集計")
+st.header("📊 月次勤怠集計")
 
-selected_month = st.date_input("集計する月を選択", today.replace(day=1))
+query_name = st.text_input("集計する名前を入力", key="name_query")
+query_month = st.text_input("対象月（例：2025-05）", key="month_query")
 
 import calendar
 
@@ -109,36 +114,34 @@ if st.button("月次を集計する") and query_name and query_month:
         }
     }
 
-    response = requests.post(url, headers=headers, json=query_payload)
-    # あとはデータ処理ロジックへ…
+    res = requests.post(url, headers=headers, json=query_payload)
+    data = res.json()
 
+    records = []
+    for result in data.get("results", []):
+        props = result["properties"]
+        def get_text(field):
+            return props[field].get("rich_text", [{}])[0].get("plain_text", "") if props.get(field) else ""
 
-    if response.status_code == 200:
-        data = response.json().get("results", [])
-        rows = []
-        for result in data:
-            props = result["properties"]
-            rows.append({
-                "日付": props["日付"]["date"]["start"],
-                "曜日": props["曜日"]["select"]["name"] if props["曜日"]["select"] else "",
-                "始業時刻": props["始業時刻"]["rich_text"][0]["text"]["content"] if props["始業時刻"]["rich_text"] else "",
-                "終業時刻": props["終業時刻"]["rich_text"][0]["text"]["content"] if props["終業時刻"]["rich_text"] else "",
-                "休憩時間": props["休憩時間"]["number"],
-                "稼働時間": float(props["稼働時間"]["rich_text"][0]["text"]["content"]) if props["稼働時間"]["rich_text"] else 0,
-                "自社勤務時間": props["自社勤務時間"]["number"],
-                "交通費": props["交通費"]["number"],
-                "特記事項": props["特記事項"]["select"]["name"] if props["特記事項"]["select"] else ""
-            })
-        
-        df = pd.DataFrame(rows)
-        df = df.sort_values("日付")
-        st.dataframe(df)
+        records.append({
+            "日付": props["日付"]["date"]["start"][:10] if props["日付"].get("date") else "",
+            "曜日": props["曜日"]["select"]["name"] if props["曜日"].get("select") else "",
+            "始業時刻": get_text("始業時刻"),
+            "終業時刻": get_text("終業時刻"),
+            "休憩時間": props["休憩時間"].get("number", 0),
+            "稼働時間": get_text("稼働時間"),
+            "自社勤務時間": props["自社勤務時間"].get("number", 0),
+            "交通費": props["交通費"].get("number", 0),
+            "特記事項": props["特記事項"]["select"]["name"] if props["特記事項"].get("select") else ""
+        })
 
-        total_work = df["稼働時間"].sum()
-        total_company = df["自社勤務時間"].sum()
-        total_fee = df["交通費"].sum()
-        st.markdown(f"✅ **稼働時間合計**: {total_work:.2f} 時間")
-        st.markdown(f"✅ **自社勤務合計**: {total_company:.2f} 時間")
-        st.markdown(f"✅ **交通費合計**: {total_fee:.0f} 円")
+    df = pd.DataFrame(records)
+    if df.empty:
+        st.warning("該当データが見つかりませんでした。")
     else:
-        st.error(f"データ取得に失敗しました: {response.text}")
+        df["日付"] = pd.to_datetime(df["日付"])
+        df = df.sort_values("日付")
+        st.dataframe(df, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 CSVダウンロード", data=csv, file_name=f"{query_name}_{query_month}_勤怠.csv", mime="text/csv")
